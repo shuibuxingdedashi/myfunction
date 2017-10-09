@@ -12,6 +12,13 @@
 11.	[截取字符](#截取字符)
 12.	[加密](#加密)
 13.	[解密](#解密)
+14.	[将某条数据记录到日志里调试](#将某条数据记录到日志里调试)
+15.	[删除文件夹](#删除文件夹)
+16.	[列出本地文件夹](#列出本地文件)
+17. [get请求](#get请求)
+18. [post请求](#post请求)
+
+
 
 ---
 
@@ -268,4 +275,165 @@ function decrypt($data)
 }
 
 
+```
+
+14. ### 将某条数据记录到日志里调试
+
+```php
+/**
+ * 将某条数据记录到日志里调试
+ * @param $data
+ */
+ 
+function t($data){
+    file_put_contents('111.log', $data. PHP_EOL, FILE_APPEND);
+}
+```
+15. ### 删除文件夹
+```php
+/**
+ * 删除文件夹
+ * @author rainfer <81818832@qq.com>
+ *
+ */
+function remove_dir($dir, $time_thres = -1)
+{
+    foreach (list_file($dir) as $f) {
+        if ($f ['isDir']) {
+            remove_dir($f ['pathname'] . '/');
+        } else if ($f ['isFile'] && $f ['filename'] != 'index.html') {
+            if ($time_thres == -1 || $f ['mtime'] < $time_thres) {
+                @unlink($f ['pathname']);
+            }
+        }
+    }
+}
+```
+16. ### 列出本地文件
+```php
+/**
+ * 列出本地目录的文件
+ * @author rainfer <81818832@qq.com>
+ *
+ * @param string $filename
+ * @param string $pattern
+ * @return Array
+ */
+function list_file($filename, $pattern = '*')
+{
+    if (strpos($pattern, '|') !== false) {
+        $patterns = explode('|', $pattern);
+    } else {
+        $patterns [0] = $pattern;
+    }
+    $i = 0;
+    $dir = array();
+    if (is_dir($filename)) {
+        $filename = rtrim($filename, '/') . '/';
+    }
+    foreach ($patterns as $pattern) {
+        $list = glob($filename . $pattern);
+        if ($list !== false) {
+            foreach ($list as $file) {
+                $dir [$i] ['filename'] = basename($file);
+                $dir [$i] ['path'] = dirname($file);
+                $dir [$i] ['pathname'] = realpath($file);
+                $dir [$i] ['owner'] = fileowner($file);
+                $dir [$i] ['perms'] = substr(base_convert(fileperms($file), 10, 8), -4);
+                $dir [$i] ['atime'] = fileatime($file);
+                $dir [$i] ['ctime'] = filectime($file);
+                $dir [$i] ['mtime'] = filemtime($file);
+                $dir [$i] ['size'] = filesize($file);
+                $dir [$i] ['type'] = filetype($file);
+                $dir [$i] ['ext'] = is_file($file) ? strtolower(substr(strrchr(basename($file), '.'), 1)) : '';
+                $dir [$i] ['isDir'] = is_dir($file);
+                $dir [$i] ['isFile'] = is_file($file);
+                $dir [$i] ['isLink'] = is_link($file);
+                $dir [$i] ['isReadable'] = is_readable($file);
+                $dir [$i] ['isWritable'] = is_writable($file);
+                $i++;
+            }
+        }
+    }
+    $cmp_func = create_function('$a,$b', '
+        if( ($a["isDir"] && $b["isDir"]) || (!$a["isDir"] && !$b["isDir"]) ){
+            return  $a["filename"]>$b["filename"]?1:-1;
+        }else{
+            if($a["isDir"]){
+                return -1;
+            }else if($b["isDir"]){
+                return 1;
+            }
+            if($a["filename"]  ==  $b["filename"])  return  0;
+            return  $a["filename"]>$b["filename"]?-1:1;
+        }
+        ');
+    usort($dir, $cmp_func);
+    return $dir;
+}
+```
+17. ### get请求
+```php
+/**
+ * GET请求
+ * @param $url
+ * @return bool|mixed
+ */
+function http_get($url)
+{
+    $oCurl = curl_init ();
+    if (stripos ( $url, "https://" ) !== FALSE) {
+        curl_setopt ( $oCurl, CURLOPT_SSL_VERIFYPEER, FALSE );
+        curl_setopt ( $oCurl, CURLOPT_SSL_VERIFYHOST, FALSE );
+    }
+    curl_setopt ( $oCurl, CURLOPT_URL, $url );
+    curl_setopt ( $oCurl, CURLOPT_RETURNTRANSFER, 1 );
+    $sContent = curl_exec ( $oCurl );
+    $aStatus = curl_getinfo ( $oCurl );
+    curl_close ( $oCurl );
+    if (intval ( $aStatus ["http_code"] ) == 200) {
+        return $sContent;
+    } else {
+        return false;
+    }
+}
+```
+18. ### post请求
+```php
+
+/**
+ * POST 请求
+ *
+ * @param string $url           
+ * @param array $param          
+ * @return string content
+ */
+function http_post($url, $param) {
+    $oCurl = curl_init ();
+    if (stripos ( $url, "https://" ) !== FALSE) {
+        curl_setopt ( $oCurl, CURLOPT_SSL_VERIFYPEER, FALSE );
+        curl_setopt ( $oCurl, CURLOPT_SSL_VERIFYHOST, false );
+    }
+    if (is_string ( $param )) {
+        $strPOST = $param;
+    } else {
+        $aPOST = array ();
+        foreach ( $param as $key => $val ) {
+            $aPOST [] = $key . "=" . urlencode ( $val );
+        }
+        $strPOST = join ( "&", $aPOST );
+    }
+    curl_setopt ( $oCurl, CURLOPT_URL, $url );
+    curl_setopt ( $oCurl, CURLOPT_RETURNTRANSFER, 1 );
+    curl_setopt ( $oCurl, CURLOPT_POST, true );
+    curl_setopt ( $oCurl, CURLOPT_POSTFIELDS, $strPOST );
+    $sContent = curl_exec ( $oCurl );
+    $aStatus = curl_getinfo ( $oCurl );
+    curl_close ( $oCurl );
+    if (intval ( $aStatus ["http_code"] ) == 200) {
+        return $sContent;
+    } else {
+        return false;
+    }
+}
 ```
